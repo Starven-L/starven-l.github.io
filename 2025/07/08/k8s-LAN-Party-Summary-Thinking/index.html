@@ -1,0 +1,214 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>k8s LAN Party - Summary &amp; Thinking | Starven's Blog</title><meta name="author" content="Starven"><meta name="copyright" content="Starven"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="Reverse DNS Scanning技术这个技术就是第一关的考察点，对于level1如果单从拿到flag来说只需要对整个k8s集群的服务 进行一个reverse dns scanning即可扫描探测服务 flag就在其中一个服务里面curl即可得到 但是深究其背后原因，其实就得深入到k8s service特性ip反解域名原理研究 因此也单独写了一篇文章https:&#x2F;&#x2F;starven-l.git">
+<meta property="og:type" content="article">
+<meta property="og:title" content="k8s LAN Party - Summary &amp; Thinking">
+<meta property="og:url" content="https://starven-l.github.io/2025/07/08/k8s-LAN-Party-Summary-Thinking/index.html">
+<meta property="og:site_name" content="Starven&#39;s Blog">
+<meta property="og:description" content="Reverse DNS Scanning技术这个技术就是第一关的考察点，对于level1如果单从拿到flag来说只需要对整个k8s集群的服务 进行一个reverse dns scanning即可扫描探测服务 flag就在其中一个服务里面curl即可得到 但是深究其背后原因，其实就得深入到k8s service特性ip反解域名原理研究 因此也单独写了一篇文章https:&#x2F;&#x2F;starven-l.git">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim">
+<meta property="article:published_time" content="2025-07-08T09:37:33.000Z">
+<meta property="article:modified_time" content="2025-07-08T09:38:44.423Z">
+<meta property="article:author" content="Starven">
+<meta property="article:tag" content="云安全">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "k8s LAN Party - Summary & Thinking",
+  "url": "https://starven-l.github.io/2025/07/08/k8s-LAN-Party-Summary-Thinking/",
+  "image": "https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim",
+  "datePublished": "2025-07-08T09:37:33.000Z",
+  "dateModified": "2025-07-08T09:38:44.423Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Starven",
+      "url": "https://starven-l.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://starven-l.github.io/2025/07/08/k8s-LAN-Party-Summary-Thinking/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'k8s LAN Party - Summary & Thinking',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">6</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" alt="Logo"><span class="site-name">Starven's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">k8s LAN Party - Summary &amp; Thinking</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">k8s LAN Party - Summary &amp; Thinking</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-07-08T09:37:33.000Z" title="发表于 2025-07-08 17:37:33">2025-07-08</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-07-08T09:38:44.423Z" title="更新于 2025-07-08 17:38:44">2025-07-08</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h1 id="Reverse-DNS-Scanning技术"><a href="#Reverse-DNS-Scanning技术" class="headerlink" title="Reverse DNS Scanning技术"></a>Reverse DNS Scanning技术</h1><p>这个技术就是第一关的考察点，对于level1如果单从拿到flag来说只需要对整个k8s集群的服务</p>
+<p>进行一个reverse dns scanning即可扫描探测服务</p>
+<p>flag就在其中一个服务里面curl即可得到</p>
+<p>但是深究其背后原因，其实就得深入到<strong>k8s service特性ip反解域名原理研究</strong></p>
+<p>因此也单独写了一篇文章<a href="https://starven-l.github.io/2025/07/04/k8s-internal-service-Discovery-k8s-service%E7%89%B9%E6%80%A7ip%E5%8F%8D%E8%A7%A3%E5%9F%9F%E5%90%8D%E5%8E%9F%E7%90%86%E7%A0%94%E7%A9%B6/">https://starven-l.github.io/2025/07/04/k8s-internal-service-Discovery-k8s-service%E7%89%B9%E6%80%A7ip%E5%8F%8D%E8%A7%A3%E5%9F%9F%E5%90%8D%E5%8E%9F%E7%90%86%E7%A0%94%E7%A9%B6/</a></p>
+<p>简要概述呢其实就是：</p>
+<ul>
+<li>k8s集群里面不支持ICMP协议（也就不能用ping来探测服务），原理是因为kube-proxy使用iptables来进行路由转发，但是其默认转发规则是禁止了icmp协议的，因此iptables模式下，无法ping通任何svc,包括clusterip.（除非手动打开让其支持icmp协议才可以ping通）</li>
+<li>k8s集群里面不支持tcp探测服务：原理是因为像Istio这种服务网格是会在pod的进出网络流量进行劫持和代理（其实level4的时候专门研究了这个流量过程，就很简单易懂了），因此无论是否有服务，TCP三次握手都会显示成功，就是因为Envoy一直监听着端口来劫持和代理流量就抢先接管TCP SYN请求，然后回应SYN ACK请求，因此导致了tcp连接成功的假象</li>
+<li>k8s集群为什么可以通过dns来探测服务的原理：pod和service都有两种dns记录的格式，其中即使是绑定了service的pod也可以成功解析，但是单纯的pod就无法成功dns解析</li>
+</ul>
+<h1 id="Sidecar-Container安全问题"><a href="#Sidecar-Container安全问题" class="headerlink" title="Sidecar Container安全问题"></a>Sidecar Container安全问题</h1><p>这一部分其实要突出的考察点就是app container和sidecar container都是在一个pod里面</p>
+<p>共享网络命名空间，生命周期，资源</p>
+<p>然后sidecar就是注入到pod里面的，这个我画了这样一个图来表示，感觉挺清晰的</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/imageasdjlaks.png?imageSlim" alt="image.png"></p>
+<p>这个题的设置呢其实就是sidecar一直在对某个api发起POST请求，flag就藏在请求体的json数据里</p>
+<p>然后在app container里面监听流量就可以监听到sidecar container的流量（因为说过了共享网络命名空间）</p>
+<h1 id="AWS-NFS的实现-EFS（libnfs库的nfs-cli来实现root的uid和gid绕过权限限制）"><a href="#AWS-NFS的实现-EFS（libnfs库的nfs-cli来实现root的uid和gid绕过权限限制）" class="headerlink" title="AWS NFS的实现 - EFS（libnfs库的nfs-cli来实现root的uid和gid绕过权限限制）"></a>AWS NFS的实现 - EFS（libnfs库的nfs-cli来实现root的uid和gid绕过权限限制）</h1><p>题目情况呢其实就是有一个网络文件共享挂载到了&#x2F;efs,但是没有任何权限可以访问flag文件</p>
+<p>这里其实就是介绍AWS NFS是没有凭据认证的一个网络文件共享，依赖于uid，gid的映射</p>
+<p>EFS 使用 NFS 协议（主要是 NFSv4.1），而 NFS 协议本身在设计上不强制进行用户级别凭据认证（不像 SMB、FTP、HTTP 那样需要用户名&#x2F;密码），依赖的是 <strong>客户端操作系统的 UID&#x2F;GID 映射</strong>。</p>
+<p>因此最后的payload也是需要设置相关的uid和gid的参数的</p>
+<p>libnfs库专门有设置的cli来操作nfs的相关api来实现ls和cat等操作</p>
+<p>因此uid和gid设置为0以root权限访问的话就可以成功绕过权限限制</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">player@wiz-k8s-lan-<span class="attr">party</span>:~$ nfs-cat <span class="string">&quot;nfs://fs-0779524599b7d5e7e.efs.us-west-1.amazonaws.com//flag.txt?version=4&amp;uid=0&amp;gid=0&quot;</span></span><br><span class="line">wiz_k8s_lan_party&#123;old-school-network-file-shares-infiltrated-the-cloud!&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="Istio客户端-bypass-RBAC的手法"><a href="#Istio客户端-bypass-RBAC的手法" class="headerlink" title="Istio客户端 bypass RBAC的手法"></a><strong>Istio客户端 bypass RBAC的手法</strong></h1><p>题目设置是rbac里面限制了权限deny访问flag，服务探测是给了个<code>istio-protected-pod-service.k8s-lan-party.svc.cluster.local</code> </p>
+<p>但是呢Istio的客户端是对其有绕过手法的</p>
+<p>比如说：因为istio不支持udp，因此UDP协议可以绕过</p>
+<p>再比如说：Istio设置iptables的时候默认跳过了uid 1337的进程流量，所以说呢以uid 1337运行的进程就可以不经过Envoy Sidecar（也就绕过了Istio，Istio处于控制平面，Envoy Sidecar处于数据平面）</p>
+<p>从这一个点来看的话，就可以通过cat &#x2F;etc&#x2F;passwd来看有没有1337 istio用户</p>
+<p>或者说呢容器有没有<code>CAP_SETUID</code> 和 <code>CAP_NET_ADMIN</code> 权限，前者呢是可以将任意的进程改为1337来绕过，后者呢可以重写自己的iptables规则并绕过Envoy代理</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">su istio</span><br><span class="line">或者查看权限</span><br><span class="line">root@wiz-k8s-lan-<span class="attr">party</span>:~# capsh --print</span><br><span class="line"><span class="title class_">Current</span>: cap_setgid,cap_setuid=eip</span><br><span class="line"><span class="title class_">Bounding</span> set =cap_setgid,cap_setuid</span><br><span class="line"><span class="title class_">Ambient</span> set =cap_setgid,cap_setuid</span><br><span class="line"><span class="title class_">Current</span> <span class="attr">IAB</span>: !cap_chown,!cap_dac_override,!cap_dac_read_search,!cap_fowner,!cap_fsetid,!cap_kill,^cap_setgid,^cap_setuid,!cap_setpcap,!cap_linux_immutable,!cap_net_bind_service,!cap_net_broadcast,!cap_net_admin,!cap_net_raw,!cap_ipc_lock,!cap_ipc_owner,!cap_sys_module,!cap_sys_rawio,!cap_sys_chroot,!cap_sys_ptrace,!cap_sys_pacct,!cap_sys_admin,!cap_sys_boot,!cap_sys_nice,!cap_sys_resource,!cap_sys_time,!cap_sys_tty_config,!cap_mknod,!cap_lease,!cap_audit_write,!cap_audit_control,!cap_setfcap,!cap_mac_override,!cap_mac_admin,!cap_syslog,!cap_wake_alarm,!cap_block_suspend,!cap_audit_read,!cap_perfmon,!cap_bpf,!cap_checkpoint_restore</span><br><span class="line"><span class="title class_">Securebits</span>: <span class="number">00</span>/<span class="number">0x0</span>/<span class="number">1</span><span class="string">&#x27;b0</span></span><br><span class="line"><span class="string"> secure-noroot: no (unlocked)</span></span><br><span class="line"><span class="string"> secure-no-suid-fixup: no (unlocked)</span></span><br><span class="line"><span class="string"> secure-keep-caps: no (unlocked)</span></span><br><span class="line"><span class="string"> secure-no-ambient-raise: no (unlocked)</span></span><br><span class="line"><span class="string">uid=0(root) euid=0(root)</span></span><br><span class="line"><span class="string">gid=0(root)</span></span><br><span class="line"><span class="string">groups=</span></span><br><span class="line"><span class="string">Guessed mode: UNCERTAIN (0)</span></span><br><span class="line"><span class="string">root@wiz-k8s-lan-party:~# </span></span><br></pre></td></tr></table></figure>
+
+<h1 id="策略注入-侧信道信息泄露：AdmissionWebhook（特别是-Kyverno-的-Mutate-策略）通过策略侧漏拿到敏感信息"><a href="#策略注入-侧信道信息泄露：AdmissionWebhook（特别是-Kyverno-的-Mutate-策略）通过策略侧漏拿到敏感信息" class="headerlink" title="策略注入 + 侧信道信息泄露：AdmissionWebhook（特别是 Kyverno 的 Mutate 策略）通过策略侧漏拿到敏感信息"></a><strong>策略注入 + 侧信道信息泄露：AdmissionWebhook（特别是 Kyverno 的 Mutate 策略）通过策略侧漏拿到敏感信息</strong></h1><p>这个题目设置是这样的，给了这样一个kyverno的已知策略</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion</span>: kyverno.<span class="property">io</span>/v1</span><br><span class="line"><span class="attr">kind</span>: <span class="title class_">Policy</span></span><br><span class="line"><span class="attr">metadata</span>:</span><br><span class="line">  <span class="attr">name</span>: apply-flag-to-env</span><br><span class="line">  <span class="attr">namespace</span>: sensitive-ns</span><br><span class="line"><span class="attr">spec</span>:</span><br><span class="line">  <span class="attr">rules</span>:</span><br><span class="line">    - <span class="attr">name</span>: inject-env-vars</span><br><span class="line">      <span class="attr">match</span>:</span><br><span class="line">        <span class="attr">resources</span>:</span><br><span class="line">          <span class="attr">kinds</span>:</span><br><span class="line">            - <span class="title class_">Pod</span></span><br><span class="line">      <span class="attr">mutate</span>:</span><br><span class="line">        <span class="attr">patchStrategicMerge</span>:</span><br><span class="line">          <span class="attr">spec</span>:</span><br><span class="line">            <span class="attr">containers</span>:</span><br><span class="line">              - <span class="attr">name</span>: <span class="string">&quot;*&quot;</span></span><br><span class="line">                <span class="attr">env</span>:</span><br><span class="line">                  - <span class="attr">name</span>: <span class="variable constant_">FLAG</span></span><br><span class="line">                    <span class="attr">value</span>: <span class="string">&quot;&#123;flag&#125;&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>mutate作用是自动修改资源内容</p>
+<p>然后理解下面这个流程</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">[你运行 kubectl apply -f pod.<span class="property">yaml</span>]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[<span class="variable constant_">API</span> <span class="title class_">Server</span> 接收创建 <span class="title class_">Pod</span> 请求]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[触发 <span class="title class_">MutatingAdmissionWebhook</span> → <span class="title class_">Kyverno</span> <span class="title class_">Webhook</span>]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[<span class="title class_">Kyverno</span> 判断：这个 <span class="title class_">Pod</span> 属于 sensitive-ns命名空间吗？匹配 <span class="title class_">Pod</span> 类型？]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[是 → 应用 mutate 策略 patchStrategicMerge]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[<span class="title class_">Kyverno</span> 修改 <span class="title class_">Pod</span> 对象 → 注入 <span class="attr">env</span>: <span class="variable constant_">FLAG</span>=&#123;flag&#125;]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[修改后的 <span class="title class_">Pod</span> 对象被返回给 <span class="variable constant_">API</span> <span class="title class_">Server</span> → 继续流程]</span><br><span class="line">           |</span><br><span class="line">           v</span><br><span class="line">[<span class="variable constant_">API</span> <span class="title class_">Server</span> 最终创建变更后的 <span class="title class_">Pod</span> 到 etcd → 节点上调度运行]</span><br></pre></td></tr></table></figure>
+
+<p>因此这里要用到一个工具：kube-review，有啥用呢？</p>
+<p>用于将提供的 Kubernetes 资源转换为 Kubernetes AdmissionReview 请求，就像<a target="_blank" rel="noopener" href="https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/">在动态准入控制</a>时从 Kubernetes API 服务器发送的一样 </p>
+<p>也就是上面流程图的这一步：可以用kube-review工具实现</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%201asjdlk.png?imageSlim" alt="image.png"></p>
+<p>GPT解释的其实很形象了</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%202faj.png?imageSlim" alt="image.png"></p>
+<p>然后就用kube-review去创建一个满足的pod.yaml，并且创建之后会返回json这就是需要的参数</p>
+<p>再去调用kyverno的mutate接口就可以获取到最开始kyverno策略的pod的详细信息</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X <span class="variable constant_">POST</span> -H <span class="string">&quot;Content-Type: application/json&quot;</span> --data @pod.<span class="property">json</span> <span class="attr">https</span>:<span class="comment">//kyverno-svc.kyverno/mutate -k</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="核心总结"><a href="#核心总结" class="headerlink" title="核心总结"></a>核心总结</h2><p>那么思考一下，放在实战环境中，如果有这样的一个kyverno策略是硬编码了ak sk在pod里面，就可以通过这种攻击手法把ak sk带出来</p>
+<p>通过构造符合条件的资源（如 Pod），注入了自己到 Kyverno 策略流程中，诱导系统自动将敏感数据注入返回体里（AdmissionReview 响应），从而实现了信息泄露</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://starven-l.github.io">Starven</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://starven-l.github.io/2025/07/08/k8s-LAN-Party-Summary-Thinking/">https://starven-l.github.io/2025/07/08/k8s-LAN-Party-Summary-Thinking/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://starven-l.github.io" target="_blank">Starven's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E4%BA%91%E5%AE%89%E5%85%A8/">云安全</a></div><div class="post-share"><div class="social-share" data-image="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2025/07/08/k8s-LAN-Party-wp-By-Starven/" title="k8s LAN Party wp - By.Starven"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">k8s LAN Party wp - By.Starven</div></div><div class="info-2"><div class="info-item-1">环境背景 背景：已经获取pod的shell  Level1 - Recon相关原理分析文章之前已经写在了【k8s internal service Discovery - k8s service特性ip反解域名原理研究】一文 reverse dns scanning即可扫到存放flag的服务，curl一下就拿到flag了 Level2 - Fiding Neighbours先利用service特性ip反解扫一下目前处于的B段有哪些服务 发现reporting-service.k8s-lan-party.svc.cluster.local但是没东西  由于题目描述说Sidecar，前面也专门写了文章学习这个  说明当前容器处于的Pod是还存在其他的容器的（按照题目说就是sidecar容器） 而我们知道The sidecar container shares the same lifecycle, resources, and network namespace as the main container. hint2提到我们的环境有tcpdump  同时我们知道由于sidecar容...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2025/07/04/k8s-internal-service-Discovery-k8s-service%E7%89%B9%E6%80%A7ip%E5%8F%8D%E8%A7%A3%E5%9F%9F%E5%90%8D%E5%8E%9F%E7%90%86%E7%A0%94%E7%A9%B6/" title="k8s internal service Discovery - k8s service特性ip反解域名原理研究"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-04</div><div class="info-item-2">k8s internal service Discovery - k8s service特性ip反解域名原理研究</div></div><div class="info-2"><div class="info-item-1">Referencehttps://thegreycorner.com/2023/12/13/kubernetes-internal-service-discovery.html#checking-environment-behaviour 【原理分析文章，主要细啃国外这篇文章，分析得很好】 https://github.com/Esonhugh/k8spider 【k8spider工具地址】 https://tari.moe/2024/k8slanparty.html 【k8s lan party writeup】 k8s - Special Recon先来看看针对k8s集群里面需要收集哪些信息？ 集群ip，port，命名空间，API server，secret，token等 1env | grep &quot;KUBERNETES&quot;  123456789player@wiz-k8s-lan-party:/home$ env | grep &quot;KUBERNETES&quot;KUBERNETES_SERVICE_PORT_HTTPS=443KUBERNETES_...</div></div></div></a><a class="pagination-related" href="/2025/07/04/k8s-sidecar%E5%AE%B9%E5%99%A8-app%E4%B8%BB%E5%AE%B9%E5%99%A8-init%E5%AE%B9%E5%99%A8%E7%9A%84%E5%85%B3%E8%81%94%E4%B8%8E%E5%8C%BA%E5%88%AB%E4%BB%A5%E5%8F%8A%E5%AE%89%E5%85%A8%E9%97%AE%E9%A2%98/" title="k8s sidecar容器 &amp; app主容器 &amp; init容器的关联与区别以及安全问题"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-04</div><div class="info-item-2">k8s sidecar容器 &amp; app主容器 &amp; init容器的关联与区别以及安全问题</div></div><div class="info-2"><div class="info-item-1">Referencehttps://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/ What is Sidecat？官方文档提到一个特性【FEATURE STATE: Kubernetes v1.33 [stable] (enabled by default: true)】 通常，一个 Pod 中只有一个应用容器 Web 应用程序需要的本地 Web 服务器就是 sidecar Sidecar 容器是与主应用程序容器一起运行在同一 Pod 中的辅助容器。这些容器用于通过提供其他服务或功能（如日志记录、监控、安全或数据同步）来增强或扩展主应用程序容器的功能，而无需直接更改主应用程序代码 Sidecar containers in Kubernetes文档写到：Kubernetes implements sidecar containers as a special case of init containers; sidecar containers remain running after Pod star...</div></div></div></a><a class="pagination-related" href="/2025/07/08/k8s-LAN-Party-wp-By-Starven/" title="k8s LAN Party wp - By.Starven"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-08</div><div class="info-item-2">k8s LAN Party wp - By.Starven</div></div><div class="info-2"><div class="info-item-1">环境背景 背景：已经获取pod的shell  Level1 - Recon相关原理分析文章之前已经写在了【k8s internal service Discovery - k8s service特性ip反解域名原理研究】一文 reverse dns scanning即可扫到存放flag的服务，curl一下就拿到flag了 Level2 - Fiding Neighbours先利用service特性ip反解扫一下目前处于的B段有哪些服务 发现reporting-service.k8s-lan-party.svc.cluster.local但是没东西  由于题目描述说Sidecar，前面也专门写了文章学习这个  说明当前容器处于的Pod是还存在其他的容器的（按照题目说就是sidecar容器） 而我们知道The sidecar container shares the same lifecycle, resources, and network namespace as the main container. hint2提到我们的环境有tcpdump  同时我们知道由于sidecar容...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Starven</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">6</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Starven-L" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="tencent://message/?uin=1732293304&amp;Site=&amp;Menu=yes" target="_blank" title="QQ"><i class="fab fa-qq" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Reverse-DNS-Scanning%E6%8A%80%E6%9C%AF"><span class="toc-number">1.</span> <span class="toc-text">Reverse DNS Scanning技术</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Sidecar-Container%E5%AE%89%E5%85%A8%E9%97%AE%E9%A2%98"><span class="toc-number">2.</span> <span class="toc-text">Sidecar Container安全问题</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#AWS-NFS%E7%9A%84%E5%AE%9E%E7%8E%B0-EFS%EF%BC%88libnfs%E5%BA%93%E7%9A%84nfs-cli%E6%9D%A5%E5%AE%9E%E7%8E%B0root%E7%9A%84uid%E5%92%8Cgid%E7%BB%95%E8%BF%87%E6%9D%83%E9%99%90%E9%99%90%E5%88%B6%EF%BC%89"><span class="toc-number">3.</span> <span class="toc-text">AWS NFS的实现 - EFS（libnfs库的nfs-cli来实现root的uid和gid绕过权限限制）</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Istio%E5%AE%A2%E6%88%B7%E7%AB%AF-bypass-RBAC%E7%9A%84%E6%89%8B%E6%B3%95"><span class="toc-number">4.</span> <span class="toc-text">Istio客户端 bypass RBAC的手法</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%AD%96%E7%95%A5%E6%B3%A8%E5%85%A5-%E4%BE%A7%E4%BF%A1%E9%81%93%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%EF%BC%9AAdmissionWebhook%EF%BC%88%E7%89%B9%E5%88%AB%E6%98%AF-Kyverno-%E7%9A%84-Mutate-%E7%AD%96%E7%95%A5%EF%BC%89%E9%80%9A%E8%BF%87%E7%AD%96%E7%95%A5%E4%BE%A7%E6%BC%8F%E6%8B%BF%E5%88%B0%E6%95%8F%E6%84%9F%E4%BF%A1%E6%81%AF"><span class="toc-number">5.</span> <span class="toc-text">策略注入 + 侧信道信息泄露：AdmissionWebhook（特别是 Kyverno 的 Mutate 策略）通过策略侧漏拿到敏感信息</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%BB%E7%BB%93"><span class="toc-number">5.1.</span> <span class="toc-text">核心总结</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/08/k8s-LAN-Party-Summary-Thinking/" title="k8s LAN Party - Summary &amp; Thinking">k8s LAN Party - Summary &amp; Thinking</a><time datetime="2025-07-08T09:37:33.000Z" title="发表于 2025-07-08 17:37:33">2025-07-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/08/k8s-LAN-Party-wp-By-Starven/" title="k8s LAN Party wp - By.Starven">k8s LAN Party wp - By.Starven</a><time datetime="2025-07-08T07:51:33.000Z" title="发表于 2025-07-08 15:51:33">2025-07-08</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/04/k8s-sidecar%E5%AE%B9%E5%99%A8-app%E4%B8%BB%E5%AE%B9%E5%99%A8-init%E5%AE%B9%E5%99%A8%E7%9A%84%E5%85%B3%E8%81%94%E4%B8%8E%E5%8C%BA%E5%88%AB%E4%BB%A5%E5%8F%8A%E5%AE%89%E5%85%A8%E9%97%AE%E9%A2%98/" title="k8s sidecar容器 &amp; app主容器 &amp; init容器的关联与区别以及安全问题">k8s sidecar容器 &amp; app主容器 &amp; init容器的关联与区别以及安全问题</a><time datetime="2025-07-04T10:09:39.000Z" title="发表于 2025-07-04 18:09:39">2025-07-04</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/04/k8s-internal-service-Discovery-k8s-service%E7%89%B9%E6%80%A7ip%E5%8F%8D%E8%A7%A3%E5%9F%9F%E5%90%8D%E5%8E%9F%E7%90%86%E7%A0%94%E7%A9%B6/" title="k8s internal service Discovery - k8s service特性ip反解域名原理研究">k8s internal service Discovery - k8s service特性ip反解域名原理研究</a><time datetime="2025-07-04T06:51:38.000Z" title="发表于 2025-07-04 14:51:38">2025-07-04</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/06/20/CVE-2025-33073%E8%BF%91%E6%9C%9F%E7%83%AD%E9%97%A8%E6%BC%8F%E6%B4%9E%E6%B5%85%E8%B0%88-%E5%9F%9F%E5%86%85%E5%A4%A7%E6%9D%80%E5%99%A8-NTLMrelay%E5%86%8D%E6%B7%BB%E6%94%BB%E5%87%BB%E5%90%91%E9%87%8F/" title="CVE-2025-33073近期热门漏洞浅谈-域内大杀器-NTLMrelay再添攻击向量">CVE-2025-33073近期热门漏洞浅谈-域内大杀器-NTLMrelay再添攻击向量</a><time datetime="2025-06-20T15:27:55.000Z" title="发表于 2025-06-20 23:27:55">2025-06-20</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;2025 By Starven</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.4.0-b2</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
