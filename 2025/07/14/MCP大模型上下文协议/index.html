@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>MCP大模型上下文协议 | Starven's Blog</title><meta name="author" content="Starven"><meta name="copyright" content="Starven"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="本文仅是对原文的阅读理解与自己处理后的cv浓缩 一、什么是Model Context Protocol1. 初识MCP及其价值2024年11月底，由 Anthropic 推出的一种开放标准，旨在统一大模型与外部数据源和工具之间的通信协议 MCP 的主要目的在于解决当前 AI 模型因数据孤岛限制而无法充分发挥潜力的难题，MCP 使得 AI 应用能够安全地访问和操作本地及远程数据 MCP的价值：显而易">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MCP大模型上下文协议">
+<meta property="og:url" content="https://starven-l.github.io/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/index.html">
+<meta property="og:site_name" content="Starven&#39;s Blog">
+<meta property="og:description" content="本文仅是对原文的阅读理解与自己处理后的cv浓缩 一、什么是Model Context Protocol1. 初识MCP及其价值2024年11月底，由 Anthropic 推出的一种开放标准，旨在统一大模型与外部数据源和工具之间的通信协议 MCP 的主要目的在于解决当前 AI 模型因数据孤岛限制而无法充分发挥潜力的难题，MCP 使得 AI 应用能够安全地访问和操作本地及远程数据 MCP的价值：显而易">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim">
+<meta property="article:published_time" content="2025-07-14T14:44:49.000Z">
+<meta property="article:modified_time" content="2025-07-14T15:33:15.866Z">
+<meta property="article:author" content="Starven">
+<meta property="article:tag" content="AI安全">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "MCP大模型上下文协议",
+  "url": "https://starven-l.github.io/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/",
+  "image": "https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim",
+  "datePublished": "2025-07-14T14:44:49.000Z",
+  "dateModified": "2025-07-14T15:33:15.866Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Starven",
+      "url": "https://starven-l.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://starven-l.github.io/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'MCP大模型上下文协议',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">10</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" alt="Logo"><span class="site-name">Starven's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">MCP大模型上下文协议</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">MCP大模型上下文协议</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-07-14T14:44:49.000Z" title="发表于 2025-07-14 22:44:49">2025-07-14</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-07-14T15:33:15.866Z" title="更新于 2025-07-14 23:33:15">2025-07-14</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><p>本文仅是对原文的阅读理解与自己处理后的cv浓缩</p>
+<h1 id="一、什么是Model-Context-Protocol"><a href="#一、什么是Model-Context-Protocol" class="headerlink" title="一、什么是Model Context Protocol"></a>一、什么是Model Context Protocol</h1><h2 id="1-初识MCP及其价值"><a href="#1-初识MCP及其价值" class="headerlink" title="1. 初识MCP及其价值"></a>1. 初识MCP及其价值</h2><p>2024年11月底，由 Anthropic 推出的一种开放标准，旨在统一大模型与外部数据源和工具之间的通信协议</p>
+<p>MCP 的主要目的在于解决当前 AI 模型因数据孤岛限制而无法充分发挥潜力的难题，MCP 使得 AI 应用能够安全地访问和操作本地及远程数据</p>
+<p>MCP的价值：显而易见，对比一下就很清晰了</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">在过去，为了让大模型等 AI 应用使用数据，要么复制粘贴，要么上传知识库，非常局限</span><br><span class="line"></span><br><span class="line">现在 MCP 可以直接在 AI 与数据（包括本地数据和互联网数据）之间架起一座桥梁，通过 MCP 服务器和 MCP 客户端</span><br></pre></td></tr></table></figure>
+
+<p>因此有了MCP，可以和数据和文件系统、开发工具、Web 和浏览器自动化、生产力和通信、各种社区生态能力全部集成，实现强大的协作工作能力，它的价值远不可估量。</p>
+<p>因此也就可以随之诞生AI Agent</p>
+<h2 id="2-MCP核心架构"><a href="#2-MCP核心架构" class="headerlink" title="2. MCP核心架构"></a>2. MCP核心架构</h2><p>原文先讲的数据安全性和工作原理，但是我认为先学习MCP核心架构较为合适，因此这部分内容前置到这里了</p>
+<p>MCP也是C&#x2F;S架构，有以下核心概念</p>
+<ul>
+<li>MCP 主机（MCP Hosts）：发起请求的 LLM 应用程序（例如 Claude Desktop、IDE 或 AI 工具）。</li>
+<li>MCP 客户端（MCP Clients）：在主机程序内部，与 MCP server 保持 1:1 的连接。</li>
+<li>MCP 服务器（MCP Servers）：为 MCP client 提供上下文、工具和 prompt 信息。</li>
+<li>本地资源（Local Resources）：本地计算机中可供 MCP server 安全访问的资源（例如文件、数据库）。</li>
+<li>远程资源（Remote Resources）：MCP server 可以连接到的远程资源（例如通过 API）。</li>
+</ul>
+<p>这里的MCP Servers也就是本地服务进程</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/imagegerge.png?imageSlim" alt="image.png"></p>
+<ul>
+<li>MCP Client：就是充当一个桥梁的关系,我画了这样一个图感觉还是挺清晰的</li>
+</ul>
+<p>（Claude Desktop 和Cursor都支持了MCP Server接入能力，它们就是作为 MCP client来连接某个MCP Server感知和实现调用。）</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%201gwrgwz.png?imageSlim" alt="image.png"></p>
+<ul>
+<li>MCP Server：</li>
+</ul>
+<p>MCP server 是 MCP 架构中的关键组件，它可以提供 3 种主要类型的功能：</p>
+<ul>
+<li>资源（Resources）：类似文件的数据，可以被客户端读取，如 API 响应或文件内容。</li>
+<li>工具（Tools）：可以被 LLM 调用的函数（需要用户批准）。</li>
+<li>提示（Prompts）：预先编写的模板，帮助用户完成特定任务。</li>
+</ul>
+<p>这些功能使 MCP server 能够为 AI 应用提供丰富的上下文信息和操作能力，从而增强 LLM 的实用性和灵活性。</p>
+<p>你可以在 MCP Servers Repository 和 Awesome MCP Servers 这两个 repo 中找到许多由社区实现的 MCP server。使用 TypeScript 编写的 MCP server 可以通过 npx 命令来运行，使用 Python 编写的 MCP server 可以通过 uvx 命令来运行。</p>
+<h2 id="3-通信机制"><a href="#3-通信机制" class="headerlink" title="3. 通信机制"></a>3. 通信机制</h2><p>MCP 协议支持两种主要的通信机制：</p>
+<p>基于标准输入输出的本地通信</p>
+<p>基于<a target="_blank" rel="noopener" href="https://zhida.zhihu.com/search?content_id=254488153&content_type=Article&match_order=1&q=SSE&zd_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ6aGlkYV9zZXJ2ZXIiLCJleHAiOjE3NTI2MzM5ODIsInEiOiJTU0UiLCJ6aGlkYV9zb3VyY2UiOiJlbnRpdHkiLCJjb250ZW50X2lkIjoyNTQ0ODgxNTMsImNvbnRlbnRfdHlwZSI6IkFydGljbGUiLCJtYXRjaF9vcmRlciI6MSwiemRfdG9rZW4iOm51bGx9.RkLAkw7pTjFGi2-s8bZZne2ilxYeuDajFr_WY57MAaU&zhida_source=entity">SSE</a>（<a href="https://link.zhihu.com/?target=https://en.wikipedia.org/wiki/Server-sent_events">Server-Sent Events</a>）的远程通信。</p>
+<p>这两种机制都使用 <a href="https://link.zhihu.com/?target=https://www.jsonrpc.org/specification">JSON-RPC 2.0</a> 格式进行消息传输，确保了通信的标准化和可扩展性</p>
+<ul>
+<li>本地通信**：**通过 stdio 传输数据，适用于在同一台机器上运行的客户端和服务器之间的通信。</li>
+<li>远程通信**：**利用 SSE 与 HTTP 结合，实现跨网络的实时数据传输，适用于需要访问远程资源或分布式部署的场景。</li>
+</ul>
+<h2 id="4-数据安全性"><a href="#4-数据安全性" class="headerlink" title="4. 数据安全性"></a>4. 数据安全性</h2><p>在我看到这个架构图的时候，我就设想了这样一条攻击链路</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%202gwrwg.png?imageSlim" alt="image.png"></p>
+<p>担心通过 MCP Server 暴露出来的数据会泄露或被非法访问，这个头疼的问题 MCP 也考虑到了</p>
+<p>MCP 通过标准化的数据访问接口，大大减少了直接接触敏感数据的环节，降低了数据泄露的风险</p>
+<p>还有，MCP 内置了安全机制，确保<strong>只有经过验证的请求</strong>才能访问特定资源，相当于在数据安全又加上了一道防线。同时，MCP协议还<strong>支持多种加密算法</strong>，以确保数据在传输过程中的安全性。</p>
+<h2 id="5-工作原理"><a href="#5-工作原理" class="headerlink" title="5. 工作原理"></a>5. 工作原理</h2><p>MCP 协议采用了一种独特的架构设计，它将 LLM 与资源之间的通信划分为三个主要部分：客户端、服务器和资源</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%203gwrgw.png?imageSlim" alt="image.png"></p>
+<h1 id="二、MCP的功能与调用"><a href="#二、MCP的功能与调用" class="headerlink" title="二、MCP的功能与调用"></a>二、MCP的功能与调用</h1><ul>
+<li>调用：</li>
+</ul>
+<p>我自己用过的其实也就Cursor和ChatGPT的Desktop</p>
+<p>我们并不需要自己开发 MCP Servers，MCP 的好处就是通用、标准，所以开发者并不需要重复造轮子</p>
+<p>推荐的是官方组织的一些 Server：<a href="https://link.zhihu.com/?target=https://github.com/modelcontextprotocol/servers">官方的 MCP Server 列表</a></p>
+<p>目前社区的 MCP Server 还是比较混乱，有很多缺少教程和文档，很多的代码功能也有问题</p>
+<p>我们可以自行尝试一下 <a href="https://link.zhihu.com/?target=https://cursor.directory/">Cursor Directory</a> 的一些例子</p>
+<ul>
+<li>功能：</li>
+</ul>
+<p>CV from zhihu</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br></pre></td><td class="code"><pre><span class="line">MCP通过引入多样化的MCP Server能力，显著增强了AI工具的功能，例如我们常用的Cursor和Claude。以下是一些官方参考服务器，展示了MCP的核心功能和SDK的应用：</span><br><span class="line"></span><br><span class="line">数据与文件系统：</span><br><span class="line"></span><br><span class="line">文件系统：提供安全文件操作，带可配置的访问控制。</span><br><span class="line"></span><br><span class="line">PostgreSQL：提供只读数据库访问，具备架构检查功能。</span><br><span class="line"></span><br><span class="line">SQLite：支持数据库交互和商业智能功能。</span><br><span class="line"></span><br><span class="line">Google Drive：实现Google Drive的文件访问和搜索功能。</span><br><span class="line"></span><br><span class="line">开发工具：</span><br><span class="line"></span><br><span class="line">Git：工具用于读取、搜索和操作Git仓库。</span><br><span class="line"></span><br><span class="line">GitHub：集成仓库管理、文件操作和GitHub API。</span><br><span class="line"></span><br><span class="line">GitLab：支持项目管理的GitLab API集成。</span><br><span class="line"></span><br><span class="line">Sentry：从http://Sentry.io获取并分析问题。</span><br><span class="line"></span><br><span class="line">网络与浏览器自动化：</span><br><span class="line"></span><br><span class="line">Brave Search：利用Brave的搜索API进行网络和本地搜索。</span><br><span class="line"></span><br><span class="line">Fetch：为LLM优化的网络内容获取和转换。</span><br><span class="line"></span><br><span class="line">Puppeteer：提供浏览器自动化和网页抓取功能。</span><br><span class="line"></span><br><span class="line">生产力和通信：</span><br><span class="line"></span><br><span class="line">Slack：支持频道管理和消息功能。</span><br><span class="line"></span><br><span class="line">Google Maps：提供位置服务、路线和地点详情。</span><br><span class="line"></span><br><span class="line">Memory：基于知识图谱的持久记忆系统。</span><br><span class="line"></span><br><span class="line">AI与专业工具：</span><br><span class="line"></span><br><span class="line">EverArt：使用多种模型进行AI图像生成。</span><br><span class="line"></span><br><span class="line">Sequential Thinking：通过思维序列进行动态问题解决。</span><br><span class="line"></span><br><span class="line">AWS KB Retrieval：使用Bedrock Agent Runtime从AWS知识库检索。</span><br><span class="line"></span><br><span class="line">官方集成工具：</span><br><span class="line"></span><br><span class="line">这些MCP服务器由公司维护，用于其平台：</span><br><span class="line"></span><br><span class="line">Axiom：使用自然语言查询和分析日志、跟踪和事件数据。</span><br><span class="line"></span><br><span class="line">Browserbase：云端自动化浏览器交互。</span><br><span class="line"></span><br><span class="line">Cloudflare：在Cloudflare开发者平台上部署和管理资源。</span><br><span class="line"></span><br><span class="line">E2B：在安全的云沙箱中执行代码。</span><br><span class="line"></span><br><span class="line">Neon：与Neon无服务器Postgres平台交互。</span><br><span class="line"></span><br><span class="line">Obsidian Markdown Notes：读取和搜索Obsidian知识库中的Markdown笔记。</span><br><span class="line"></span><br><span class="line">Qdrant：使用Qdrant向量搜索引擎实现语义记忆。</span><br><span class="line"></span><br><span class="line">Raygun：访问崩溃报告和监控数据。</span><br><span class="line"></span><br><span class="line">Search1API：统一的API用于搜索、爬虫和网站地图。</span><br><span class="line"></span><br><span class="line">Tinybird：与Tinybird无服务器ClickHouse平台交互。</span><br><span class="line"></span><br><span class="line">集成工具：</span><br><span class="line"></span><br><span class="line">Docker：管理容器、镜像、卷和网络。</span><br><span class="line"></span><br><span class="line">Kubernetes：管理pod、部署和服务。</span><br><span class="line"></span><br><span class="line">Linear：项目管理和问题跟踪。</span><br><span class="line"></span><br><span class="line">Snowflake：与Snowflake数据库交互。</span><br><span class="line"></span><br><span class="line">Spotify：控制Spotify播放和管理播放列表。</span><br><span class="line"></span><br><span class="line">Todoist：任务管理集成。</span><br></pre></td></tr></table></figure>
+
+<p>目前支持的部分工具列表（更多见<a href="https://link.zhihu.com/?target=https://www.pulsemcp.com/clients">这里</a>）：<a target="_blank" rel="noopener" href="https://www.pulsemcp.com/clients">https://www.pulsemcp.com/clients</a></p>
+<h1 id="三、如何使用和开发MCP-Server"><a href="#三、如何使用和开发MCP-Server" class="headerlink" title="三、如何使用和开发MCP Server"></a>三、如何使用和开发MCP Server</h1><p>我这里试试cursor</p>
+<p>Cursor 0.45.6 版本提供了MCP功能，Cursor将作为MCP服务客户端使用MCP服务，在Cursor中通过简单的配置就可以完成MCP服务的接入</p>
+<p><a target="_blank" rel="noopener" href="https://docs.cursor.com/tools/mcp">https://docs.cursor.com/tools/mcp</a></p>
+<p><a target="_blank" rel="noopener" href="https://cursor.directory/mcp">https://cursor.directory/mcp</a></p>
+<p>我这里是连了个notion mcp，当然还有文件系统的mcp server比如</p>
+<p>Github地址：<a href="https://link.zhihu.com/?target=https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem">https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem</a></p>
+<p>选择使用NPX方式引入之后就可以操作文件系统实现AI Agent</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  &quot;mcpServers&quot;: &#123;</span><br><span class="line">    &quot;Notion&quot;: &#123;</span><br><span class="line">      &quot;url&quot;: &quot;https://mcp.notion.com/mcp&quot;</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;filesystem&quot;: &#123;</span><br><span class="line">      &quot;command&quot;: &quot;npx&quot;,</span><br><span class="line">      &quot;args&quot;: [&quot;-y&quot;, &quot;@modelcontextprotocol/server-filesystem&quot;,&quot;/Users/starven&quot;]</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%204gwr.png?imageSlim" alt="image.png"></p>
+<h1 id="四、MCP如何工作？"><a href="#四、MCP如何工作？" class="headerlink" title="四、MCP如何工作？"></a>四、MCP如何工作？</h1><p>看到原文有这样一段话写的挺好的</p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%205jeg.png?imageSlim" alt="image.png"></p>
+<ul>
+<li>MCP Server工作原理</li>
+</ul>
+<p>开发一个 Github MCP Server，这个 Server 需要提供查找 Repository、搜索 Issues 和创建 Issue 三种能力。</p>
+<p>这里贴两段代码，暂时不详细分析，之后等啥时候心血来潮的时候想开发一个MCP Server的时候再来写写玩</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br></pre></td><td class="code"><pre><span class="line">const server = new Server(</span><br><span class="line">  &#123;</span><br><span class="line">    name: &quot;github-mcp-server&quot;,</span><br><span class="line">    version: VERSION,</span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    capabilities: &#123;</span><br><span class="line">      tools: &#123;&#125;,</span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line">server.setRequestHandler(ListToolsRequestSchema, async () =&gt; &#123;</span><br><span class="line">  return &#123;</span><br><span class="line">    tools: [</span><br><span class="line">      &#123;</span><br><span class="line">        name: &quot;search_repositories&quot;,</span><br><span class="line">        description: &quot;Search for GitHub repositories&quot;,</span><br><span class="line">        inputSchema: zodToJsonSchema(repository.SearchRepositoriesSchema),</span><br><span class="line">      &#125;,</span><br><span class="line">      &#123;</span><br><span class="line">        name: &quot;create_issue&quot;,</span><br><span class="line">        description: &quot;Create a new issue in a GitHub repository&quot;,</span><br><span class="line">        inputSchema: zodToJsonSchema(issues.CreateIssueSchema),</span><br><span class="line">      &#125;,</span><br><span class="line">      &#123;</span><br><span class="line">        name: &quot;search_issues&quot;,</span><br><span class="line">        description: &quot;Search for issues and pull requests across GitHub repositories&quot;,</span><br><span class="line">        inputSchema: zodToJsonSchema(search.SearchIssuesSchema),</span><br><span class="line">      &#125;</span><br><span class="line">    ],</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">server.setRequestHandler(CallToolRequestSchema, async (request) =&gt; &#123;</span><br><span class="line">  try &#123;</span><br><span class="line">    if (!request.params.arguments) &#123;</span><br><span class="line">      throw new Error(&quot;Arguments are required&quot;);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    switch (request.params.name) &#123;</span><br><span class="line">      case &quot;search_repositories&quot;: &#123;</span><br><span class="line">        const args = repository.SearchRepositoriesSchema.parse(request.params.arguments);</span><br><span class="line">        const results = await repository.searchRepositories(</span><br><span class="line">          args.query,</span><br><span class="line">          args.page,</span><br><span class="line">          args.perPage</span><br><span class="line">        );</span><br><span class="line">        return &#123;</span><br><span class="line">          content: [&#123; type: &quot;text&quot;, text: JSON.stringify(results, null, 2) &#125;],</span><br><span class="line">        &#125;;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      case &quot;create_issue&quot;: &#123;</span><br><span class="line">        const args = issues.CreateIssueSchema.parse(request.params.arguments);</span><br><span class="line">        const &#123; owner, repo, ...options &#125; = args;</span><br><span class="line">        const issue = await issues.createIssue(owner, repo, options);</span><br><span class="line">        return &#123;</span><br><span class="line">          content: [&#123; type: &quot;text&quot;, text: JSON.stringify(issue, null, 2) &#125;],</span><br><span class="line">        &#125;;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      case &quot;search_issues&quot;: &#123;</span><br><span class="line">        const args = search.SearchIssuesSchema.parse(request.params.arguments);</span><br><span class="line">        const results = await search.searchIssues(args);</span><br><span class="line">        return &#123;</span><br><span class="line">          content: [&#123; type: &quot;text&quot;, text: JSON.stringify(results, null, 2) &#125;],</span><br><span class="line">        &#125;;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      default:</span><br><span class="line">        throw new Error(`Unknown tool: $&#123;request.params.name&#125;`);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125; catch (error) &#123;&#125;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">async function runServer() &#123;</span><br><span class="line">  const transport = new StdioServerTransport();</span><br><span class="line">  await server.connect(transport);</span><br><span class="line">  console.error(&quot;GitHub MCP Server running on stdio&quot;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">runServer().catch((error) =&gt; &#123;</span><br><span class="line">  console.error(&quot;Fatal error in main():&quot;, error);</span><br><span class="line">  process.exit(1);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>通过 <code>server.setRequestHandler</code> 来告诉 Client 端我们提供了哪些能力，通过 <code>description</code> 字段来描述这个能力的作用，通过 <code>inputSchema</code> 来描述完成这个能力需要的输入参数。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">export const SearchOptions = z.object(&#123;</span><br><span class="line">  q: z.string(),</span><br><span class="line">  order: z.enum([&quot;asc&quot;, &quot;desc&quot;]).optional(),</span><br><span class="line">  page: z.number().min(1).optional(),</span><br><span class="line">  per_page: z.number().min(1).max(100).optional(),</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">export const SearchIssuesOptions = SearchOptions.extend(&#123;</span><br><span class="line">  sort: z.enum([</span><br><span class="line">    &quot;comments&quot;,</span><br><span class="line">    ...</span><br><span class="line">  ]).optional(),</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">export async function searchUsers(params: z.infer&lt;typeof SearchUsersSchema&gt;) &#123;</span><br><span class="line">  return githubRequest(buildUrl(&quot;https://api.github.com/search/users&quot;, params));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">export const SearchRepositoriesSchema = z.object(&#123;</span><br><span class="line">  query: z.string().describe(&quot;Search query (see GitHub search syntax)&quot;),</span><br><span class="line">  page: z.number().optional().describe(&quot;Page number for pagination (default: 1)&quot;),</span><br><span class="line">  perPage: z.number().optional().describe(&quot;Number of results per page (default: 30, max: 100)&quot;),</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">export async function searchRepositories(</span><br><span class="line">  query: string,</span><br><span class="line">  page: number = 1,</span><br><span class="line">  perPage: number = 30</span><br><span class="line">) &#123;</span><br><span class="line">  const url = new URL(&quot;https://api.github.com/search/repositories&quot;);</span><br><span class="line">  url.searchParams.append(&quot;q&quot;, query);</span><br><span class="line">  url.searchParams.append(&quot;page&quot;, page.toString());</span><br><span class="line">  url.searchParams.append(&quot;per_page&quot;, perPage.toString());</span><br><span class="line"></span><br><span class="line">  const response = await githubRequest(url.toString());</span><br><span class="line">  return GitHubSearchResponseSchema.parse(response);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果我们想要实现一个更强大的 AI Agent，例如我们想让 AI Agent 自动的根据本地错误日志，自动搜索相关的 GitHub Repository，然后搜索 Issue，最后将结果发送到 Slack</p>
+<p>那么我们可能需要创建三个不同的 MCP Server，一个是 Local Log Server，用来查询本地日志；一个是 GitHub Server，用来搜索 Issue；还有一个是 Slack Server，用来发送消息</p>
+<h1 id="Reference："><a href="#Reference：" class="headerlink" title="Reference："></a>Reference：</h1><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/27327515233">https://zhuanlan.zhihu.com/p/27327515233</a></p>
+<p><a target="_blank" rel="noopener" href="https://mcp-docs.cn/introduction">https://mcp-docs.cn/introduction</a></p>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/1892290520732123744">https://zhuanlan.zhihu.com/p/1892290520732123744</a><br><a target="_blank" rel="noopener" href="https://guangzhengli.com/blog/zh/model-context-protocol">https://guangzhengli.com/blog/zh/model-context-protocol</a></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://starven-l.github.io">Starven</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://starven-l.github.io/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/">https://starven-l.github.io/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://starven-l.github.io" target="_blank">Starven's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%E5%AE%89%E5%85%A8/">AI安全</a></div><div class="post-share"><div class="social-share" data-image="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2025/07/14/Exchange-%E6%94%BB%E5%87%BB%E4%B8%93%E9%A2%98/" title="Exchange 攻击专题"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">Exchange 攻击专题</div></div><div class="info-2"><div class="info-item-1">仅是对原文的阅读理解cv浓缩 攻击向量 若没有任何凭据  12341.泄露信息  2.爆破邮箱账户  3.配合钓鱼进行中继  4.RCE   有普通凭据  12345671.导出邮箱列表2.搜索自身敏感邮件3.搜索共享文件4.搜索域信息5.攻击 Outlook 客户端6.配合 SSRF 进行中继7.RCE   有高权限凭据  121.全局邮件管理2.攻击域管  一、无任何权限的攻击向量1. 探测发现Exchange邮件服务 域内定位  1234567891011通过SPN：setspn -Q exchange*/*通过DNS：nslookup -type=srv _autodiscover._tcp通过LDAP查SPN：AdFind.exe -h 域控ip -b &quot;DC=example,DC=com&quot; -f &quot;|(ServicePrincipalName=exchange*)(ServicePrincipalName=smtp*)(ServicePrincipalName=imap*)(ServicePrincipalName=pop*)&quot;...</div></div></div></a><a class="pagination-related" href="/2025/07/10/EKS-Cluster-Games-Summary/" title="EKS Cluster Games - Summary"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">EKS Cluster Games - Summary</div></div><div class="info-2"><div class="info-item-1">容器信息收集中kubectl常用命令总结总结：常用的信息收集命令(因为这关就是对secrets有list和get的权限) 1234567kubectl auth can-i --list kubectl get secrets kubectl get secrets secret-name -o json | jqkubectl get podskubectl get pod pod-name -o jsonpath=&#x27;&#123;.spec.containers[*].name&#125;&#x27;kubectl exex -it pod-name -c my-container -- /bin/bash  Attack Docker或ECR等私有镜像仓库情景：已经有pod的shell和secret的get权限，pod的get和list权限，但是没有进入某个具体容器的权限 1234567891011kubectl get pod pod-name 之后如果有imagePullSecrets--&gt;获取到secrets仓库名--&gt;kubectl get se...</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Starven</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">10</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Starven-L" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="tencent://message/?uin=1732293304&amp;Site=&amp;Menu=yes" target="_blank" title="QQ"><i class="fab fa-qq" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E4%BB%80%E4%B9%88%E6%98%AFModel-Context-Protocol"><span class="toc-number">1.</span> <span class="toc-text">一、什么是Model Context Protocol</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E5%88%9D%E8%AF%86MCP%E5%8F%8A%E5%85%B6%E4%BB%B7%E5%80%BC"><span class="toc-number">1.1.</span> <span class="toc-text">1. 初识MCP及其价值</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-MCP%E6%A0%B8%E5%BF%83%E6%9E%B6%E6%9E%84"><span class="toc-number">1.2.</span> <span class="toc-text">2. MCP核心架构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6"><span class="toc-number">1.3.</span> <span class="toc-text">3. 通信机制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E6%95%B0%E6%8D%AE%E5%AE%89%E5%85%A8%E6%80%A7"><span class="toc-number">1.4.</span> <span class="toc-text">4. 数据安全性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86"><span class="toc-number">1.5.</span> <span class="toc-text">5. 工作原理</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%BA%8C%E3%80%81MCP%E7%9A%84%E5%8A%9F%E8%83%BD%E4%B8%8E%E8%B0%83%E7%94%A8"><span class="toc-number">2.</span> <span class="toc-text">二、MCP的功能与调用</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8%E5%92%8C%E5%BC%80%E5%8F%91MCP-Server"><span class="toc-number">3.</span> <span class="toc-text">三、如何使用和开发MCP Server</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%9B%9B%E3%80%81MCP%E5%A6%82%E4%BD%95%E5%B7%A5%E4%BD%9C%EF%BC%9F"><span class="toc-number">4.</span> <span class="toc-text">四、MCP如何工作？</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Reference%EF%BC%9A"><span class="toc-number">5.</span> <span class="toc-text">Reference：</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/14/Exchange-%E6%94%BB%E5%87%BB%E4%B8%93%E9%A2%98/" title="Exchange 攻击专题">Exchange 攻击专题</a><time datetime="2025-07-14T15:39:37.000Z" title="发表于 2025-07-14 23:39:37">2025-07-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/" title="MCP大模型上下文协议">MCP大模型上下文协议</a><time datetime="2025-07-14T14:44:49.000Z" title="发表于 2025-07-14 22:44:49">2025-07-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/10/EKS-Cluster-Games-Summary/" title="EKS Cluster Games - Summary">EKS Cluster Games - Summary</a><time datetime="2025-07-10T03:37:11.000Z" title="发表于 2025-07-10 11:37:11">2025-07-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/09/EKS-Cluster-Games-wp-By-Starven/" title="EKS Cluster Games wp - By.Starven">EKS Cluster Games wp - By.Starven</a><time datetime="2025-07-09T09:37:27.000Z" title="发表于 2025-07-09 17:37:27">2025-07-09</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/08/k8s-LAN-Party-Summary-Thinking/" title="k8s LAN Party - Summary &amp; Thinking">k8s LAN Party - Summary &amp; Thinking</a><time datetime="2025-07-08T09:37:33.000Z" title="发表于 2025-07-08 17:37:33">2025-07-08</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;2025 By Starven</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.4.0-b2</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
